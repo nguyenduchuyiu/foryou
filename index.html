@@ -375,6 +375,8 @@
         let cameraPanOffsetX = 0;
         let cameraPanOffsetY = 0;
 
+        let lastPanX = null, lastPanY = null; // Thêm biến lưu vị trí pan trước đó
+
         // --- Xử lý sự kiện chuột (cho máy tính để bàn) ---
         document.addEventListener('mousemove', (event) => {
             if (isDragging) {
@@ -438,9 +440,8 @@
 
         // --- Xử lý sự kiện chạm (cho thiết bị di động) ---
         document.addEventListener('touchmove', (event) => {
-           // Handle pinch zoom
+            // Handle pinch zoom
             if (event.touches.length === 2) {
-                // Calculate the distance between the two pointers
                 const touch1 = event.touches[0];
                 const touch2 = event.touches[1];
 
@@ -449,47 +450,43 @@
                     (touch2.clientY - touch1.clientY) ** 2
                 );
 
-                // Calculate the change in distance from the last move
+                // --- PAN LOGIC FOR MOBILE ---
+                // Tính trung điểm của 2 ngón
+                const midX = (touch1.clientX + touch2.clientX) / 2;
+                const midY = (touch1.clientY + touch2.clientY) / 2;
+
+                // Nếu đã có vị trí pan trước đó thì tính delta
+                if (lastPanX !== null && lastPanY !== null) {
+                    const deltaX = midX - lastPanX;
+                    const deltaY = midY - lastPanY;
+
+                    // Nếu delta nhỏ (không phải pinch), thì pan camera
+                    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+                        cameraPanOffsetX -= deltaX * 0.08;
+                        cameraPanOffsetY += deltaY * 0.08;
+                        didMoveDuringDrag = true;
+                    }
+                }
+                lastPanX = midX;
+                lastPanY = midY;
+                // --- END PAN LOGIC ---
+
+                // Pinch zoom logic
                 if (typeof lastPinchDistance === 'number') {
                     const deltaDistance = distance - lastPinchDistance;
-
-                    // Adjust the camera distance based on the change in pinch distance
-                    cameraTargetDistance -= deltaDistance * 0.1; // Adjust sensitivity as needed
-                    cameraTargetDistance = Math.max(5, Math.min(300, cameraTargetDistance)); // Clamp zoom
+                    cameraTargetDistance -= deltaDistance * 0.1;
+                    cameraTargetDistance = Math.max(5, Math.min(300, cameraTargetDistance));
                 }
-
-                // Store the current distance for the next move
                 lastPinchDistance = distance;
-				event.preventDefault();
-
+                event.preventDefault();
             } else if (!isDragging || event.touches.length === 0) {
-				return; // Chỉ xử lý nếu đang kéo và có ngón tay chạm
-			}
-			else {
-				const currentPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-				const currentPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-
-				const deltaX = currentPointerX - lastPointerX;
-				const deltaY = currentPointerY - lastPointerY;
-
-				cameraRotationY -= deltaX * 2;
-				cameraRotationX -= deltaY * 2;
-				cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
-
-                // Pan the camera
-                cameraPanOffsetX -= deltaX * 8;
-                cameraPanOffsetY += deltaY * 8;
-
-				lastPointerX = currentPointerX;
-				lastPointerY = currentPointerY;
-
-				// Đánh dấu là đã di chuyển trong quá trình kéo
-				if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
-					didMoveDuringDrag = true;
-				}
-				event.preventDefault(); // Ngăn cuộn trang mặc định
-			}
-        }, { passive: false }); // { passive: false } để có thể gọi preventDefault
+                return;
+            } else {
+                // ... existing code for 1 ngón xoay ...
+                lastPanX = null; lastPanY = null; // Reset pan khi không phải 2 ngón
+                // ... existing code ...
+            }
+        }, { passive: false });
 
         document.addEventListener('touchstart', (event) => {
             if (event.touches.length > 0) {
@@ -498,25 +495,24 @@
                 lastPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
                 lastPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
             }
-			if (event.touches.length === 2) {
-				const touch1 = event.touches[0];
-				const touch2 = event.touches[1];
-				lastPinchDistance = Math.sqrt(
-					(touch2.clientX - touch1.clientX) ** 2 +
-					(touch2.clientY - touch1.clientY) ** 2
-				);
-			}
+            if (event.touches.length === 2) {
+                // ... existing code ...
+                lastPanX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+                lastPanY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+            }
             event.preventDefault(); // Ngăn cuộn trang mặc định
         }, { passive: false });
 
         document.addEventListener('touchend', () => {
             isDragging = false;
-			lastPinchDistance = null;
+            lastPinchDistance = null;
+            lastPanX = null;
+            lastPanY = null;
         });
 
         document.addEventListener('touchcancel', () => {
             isDragging = false;
-			lastPinchDistance = null;
+            lastPinchDistance = null;
         });
 
 
