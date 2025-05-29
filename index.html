@@ -476,6 +476,10 @@
 				cameraRotationX -= deltaY * 2;
 				cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
 
+                // Pan the camera
+                cameraPanOffsetX -= deltaX * 8;
+                cameraPanOffsetY += deltaY * 8;
+
 				lastPointerX = currentPointerX;
 				lastPointerY = currentPointerY;
 
@@ -705,7 +709,6 @@
             } catch (error) {
                 console.error('Error starting audio context or loading music:', error);
                 // Optionally, display an error message to the user
-                // For a user-friendly message, you could update a div on the page
                 // document.getElementById('error-message-div').innerText = 'Không thể tải nhạc. Vui lòng kiểm tra đường dẫn hoặc kết nối internet.';
             }
         }
