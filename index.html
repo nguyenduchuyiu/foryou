@@ -438,26 +438,53 @@
 
         // --- Xử lý sự kiện chạm (cho thiết bị di động) ---
         document.addEventListener('touchmove', (event) => {
-            if (!isDragging || event.touches.length === 0) return; // Chỉ xử lý nếu đang kéo và có ngón tay chạm
+           // Handle pinch zoom
+            if (event.touches.length === 2) {
+                // Calculate the distance between the two pointers
+                const touch1 = event.touches[0];
+                const touch2 = event.touches[1];
 
-            const currentPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-            const currentPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+                const distance = Math.sqrt(
+                    (touch2.clientX - touch1.clientX) ** 2 +
+                    (touch2.clientY - touch1.clientY) ** 2
+                );
 
-            const deltaX = currentPointerX - lastPointerX;
-            const deltaY = currentPointerY - lastPointerY;
+                // Calculate the change in distance from the last move
+                if (typeof lastPinchDistance === 'number') {
+                    const deltaDistance = distance - lastPinchDistance;
 
-            cameraRotationY -= deltaX * 2;
-            cameraRotationX -= deltaY * 2;
-            cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
+                    // Adjust the camera distance based on the change in pinch distance
+                    cameraTargetDistance -= deltaDistance * 0.1; // Adjust sensitivity as needed
+                    cameraTargetDistance = Math.max(5, Math.min(300, cameraTargetDistance)); // Clamp zoom
+                }
 
-            lastPointerX = currentPointerX;
-            lastPointerY = currentPointerY;
+                // Store the current distance for the next move
+                lastPinchDistance = distance;
+				event.preventDefault();
 
-            // Đánh dấu là đã di chuyển trong quá trình kéo
-            if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
-                didMoveDuringDrag = true;
-            }
-            event.preventDefault(); // Ngăn cuộn trang mặc định
+            } else if (!isDragging || event.touches.length === 0) {
+				return; // Chỉ xử lý nếu đang kéo và có ngón tay chạm
+			}
+			else {
+				const currentPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+				const currentPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+
+				const deltaX = currentPointerX - lastPointerX;
+				const deltaY = currentPointerY - lastPointerY;
+
+				cameraRotationY -= deltaX * 2;
+				cameraRotationX -= deltaY * 2;
+				cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
+
+				lastPointerX = currentPointerX;
+				lastPointerY = currentPointerY;
+
+				// Đánh dấu là đã di chuyển trong quá trình kéo
+				if (Math.abs(deltaX) > 0.001 || Math.abs(deltaY) > 0.001) {
+					didMoveDuringDrag = true;
+				}
+				event.preventDefault(); // Ngăn cuộn trang mặc định
+			}
         }, { passive: false }); // { passive: false } để có thể gọi preventDefault
 
         document.addEventListener('touchstart', (event) => {
@@ -467,15 +494,25 @@
                 lastPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
                 lastPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
             }
+			if (event.touches.length === 2) {
+				const touch1 = event.touches[0];
+				const touch2 = event.touches[1];
+				lastPinchDistance = Math.sqrt(
+					(touch2.clientX - touch1.clientX) ** 2 +
+					(touch2.clientY - touch1.clientY) ** 2
+				);
+			}
             event.preventDefault(); // Ngăn cuộn trang mặc định
         }, { passive: false });
 
         document.addEventListener('touchend', () => {
             isDragging = false;
+			lastPinchDistance = null;
         });
 
         document.addEventListener('touchcancel', () => {
             isDragging = false;
+			lastPinchDistance = null;
         });
 
 
@@ -642,7 +679,6 @@
         // --- Audio Logic with Tone.js ---
         let backgroundMusicPlayer;
         const audioStartOverlay = document.getElementById('audio-start-overlay');
-        const audioStartButton = document.getElementById('audio-start-button');
         let audioStarted = false;
 
         // Function to start audio
@@ -661,7 +697,9 @@
                 }).toDestination();
 
                 // Remove the overlay after audio starts
-                audioStartOverlay.style.display = 'none';
+                if (audioStartOverlay) {
+                    audioStartOverlay.style.display = 'none';
+                }
                 audioStarted = true;
 
             } catch (error) {
@@ -672,16 +710,13 @@
             }
         }
 
-        // Event listener for the button click to start audio
-        // audioStartButton.addEventListener('click', startAudio); // No longer needed
-
-        // Fallback: If user clicks anywhere else on the overlay, start audio
-        // audioStartOverlay.addEventListener('click', startAudio); // No longer needed
-
         // Start audio immediately
         startAudio();
 
         // --- End Audio Logic ---
+
+		// Store the last pinch distance
+		let lastPinchDistance = null;
     </script>
 </body>
 </html>
