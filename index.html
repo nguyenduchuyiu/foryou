@@ -376,6 +376,9 @@
         let cameraPanOffsetY = 0;
 
         let lastPanX = null, lastPanY = null; // Thêm biến lưu vị trí pan trước đó
+        let lastPinchDistance = null;
+        let cameraRotationZ = 0;
+        let lastPinchAngle = null;
 
         // --- Xử lý sự kiện chuột (cho máy tính để bàn) ---
         document.addEventListener('mousemove', (event) => {
@@ -440,38 +443,29 @@
 
         // --- Xử lý sự kiện chạm (cho thiết bị di động) ---
         document.addEventListener('touchmove', (event) => {
-            // Handle pinch zoom
             if (event.touches.length === 2) {
+                // --- PAN & ZOOM ---
                 const touch1 = event.touches[0];
                 const touch2 = event.touches[1];
 
+                // Pan
+                const midX = (touch1.clientX + touch2.clientX) / 2;
+                const midY = (touch1.clientY + touch2.clientY) / 2;
+                if (lastPanX !== null && lastPanY !== null) {
+                    const deltaX = midX - lastPanX;
+                    const deltaY = midY - lastPanY;
+                    cameraPanOffsetX -= deltaX * 0.08;
+                    cameraPanOffsetY += deltaY * 0.08;
+                    didMoveDuringDrag = true;
+                }
+                lastPanX = midX;
+                lastPanY = midY;
+
+                // Zoom
                 const distance = Math.sqrt(
                     (touch2.clientX - touch1.clientX) ** 2 +
                     (touch2.clientY - touch1.clientY) ** 2
                 );
-
-                // --- PAN LOGIC FOR MOBILE ---
-                // Tính trung điểm của 2 ngón
-                const midX = (touch1.clientX + touch2.clientX) / 2;
-                const midY = (touch1.clientY + touch2.clientY) / 2;
-
-                // Nếu đã có vị trí pan trước đó thì tính delta
-                if (lastPanX !== null && lastPanY !== null) {
-                    const deltaX = midX - lastPanX;
-                    const deltaY = midY - lastPanY;
-
-                    // Nếu delta nhỏ (không phải pinch), thì pan camera
-                    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-                        cameraPanOffsetX -= deltaX * 0.08;
-                        cameraPanOffsetY += deltaY * 0.08;
-                        didMoveDuringDrag = true;
-                    }
-                }
-                lastPanX = midX;
-                lastPanY = midY;
-                // --- END PAN LOGIC ---
-
-                // Pinch zoom logic
                 if (typeof lastPinchDistance === 'number') {
                     const deltaDistance = distance - lastPinchDistance;
                     cameraTargetDistance -= deltaDistance * 0.1;
@@ -479,28 +473,45 @@
                 }
                 lastPinchDistance = distance;
                 event.preventDefault();
-            } else if (!isDragging || event.touches.length === 0) {
-                return;
-            } else {
-                // ... existing code for 1 ngón xoay ...
-                lastPanX = null; lastPanY = null; // Reset pan khi không phải 2 ngón
-                // ... existing code ...
+            } else if (event.touches.length === 1) {
+                // --- ORBIT X/Y BY 1 FINGER ---
+                const touch = event.touches[0];
+                const currentX = touch.clientX;
+                const currentY = touch.clientY;
+                if (typeof lastPointerX === 'number' && typeof lastPointerY === 'number') {
+                    const deltaX = currentX - lastPointerX;
+                    const deltaY = currentY - lastPointerY;
+                    cameraRotationY -= deltaX * 0.01; // Quay trái/phải
+                    cameraRotationX -= deltaY * 0.01; // Ngửa lên/xuống
+                    cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
+                    didMoveDuringDrag = true;
+                }
+                lastPointerX = currentX;
+                lastPointerY = currentY;
+                // Reset pan/zoom/z-rotation
+                lastPanX = null;
+                lastPanY = null;
+                lastPinchDistance = null;
+                lastPinchAngle = null;
             }
         }, { passive: false });
 
         document.addEventListener('touchstart', (event) => {
-            if (event.touches.length > 0) {
+            if (event.touches.length === 1) {
+                lastPointerX = event.touches[0].clientX;
+                lastPointerY = event.touches[0].clientY;
                 isDragging = true;
-                didMoveDuringDrag = false; // Reset cờ di chuyển
-                lastPointerX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-                lastPointerY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+                didMoveDuringDrag = false;
             }
             if (event.touches.length === 2) {
-                // ... existing code ...
                 lastPanX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
                 lastPanY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+                lastPinchDistance = Math.sqrt(
+                    (event.touches[1].clientX - event.touches[0].clientX) ** 2 +
+                    (event.touches[1].clientY - event.touches[0].clientY) ** 2
+                );
             }
-            event.preventDefault(); // Ngăn cuộn trang mặc định
+            event.preventDefault();
         }, { passive: false });
 
         document.addEventListener('touchend', () => {
@@ -508,6 +519,8 @@
             lastPinchDistance = null;
             lastPanX = null;
             lastPanY = null;
+            lastPointerX = null;
+            lastPointerY = null;
         });
 
         document.addEventListener('touchcancel', () => {
@@ -603,9 +616,21 @@
 
 
             cameraCurrentDistance += (cameraTargetDistance - cameraCurrentDistance) * 0.1;
-            camera.position.x = Math.sin(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance + cameraPanOffsetX;
-            camera.position.y = Math.sin(cameraRotationX) * cameraCurrentDistance + cameraPanOffsetY;
-            camera.position.z = Math.cos(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance;
+            let camX = Math.sin(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance + cameraPanOffsetX;
+            let camY = Math.sin(cameraRotationX) * cameraCurrentDistance + cameraPanOffsetY;
+            let camZ = Math.cos(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance;
+
+            // Áp dụng xoay quanh trục Z
+            const cosZ = Math.cos(cameraRotationZ);
+            const sinZ = Math.sin(cameraRotationZ);
+            let relX = camX - cameraPanOffsetX;
+            let relY = camY - cameraPanOffsetY;
+            let rotX = relX * cosZ - relY * sinZ;
+            let rotY = relX * sinZ + relY * cosZ;
+            camX = rotX + cameraPanOffsetX;
+            camY = rotY + cameraPanOffsetY;
+
+            camera.position.set(camX, camY, camZ);
             camera.lookAt(cameraPanOffsetX, cameraPanOffsetY, 0);
 
             particles.rotation.y += 0.0004;
@@ -713,9 +738,6 @@
         startAudio();
 
         // --- End Audio Logic ---
-
-		// Store the last pinch distance
-		let lastPinchDistance = null;
     </script>
 </body>
 </html>

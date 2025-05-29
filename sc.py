@@ -2,7 +2,8 @@ import qrcode
 import numpy as np
 from PIL import Image, ImageDraw
 
-URL = "https://nguyenduchuyiu.github.io/foryou/"
+# URL = "https://nguyenduchuyiu.github.io/foryou/"
+URL = "00020101021138560010A0000007270126000697041501121058725587790208QRIBFTTA53037045802VN63043E18"
 
 # ——————————————
 # 1) Tạo QR pink & mask trái tim (toàn bộ canvas)
