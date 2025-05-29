@@ -483,8 +483,8 @@
                     const deltaX = currentX - lastPointerX;
                     const deltaY = currentY - lastPointerY;
 
-                    cameraRotationY -= deltaX * 2; // Orbit trái/phải (Giữ nguyên dấu)
-                    cameraRotationX -= deltaY * 2; // Orbit lên/xuống (Giữ nguyên dấu)
+                    cameraRotationY -= deltaX * 1; // Orbit trái/phải (Giảm hệ số)
+                    cameraRotationX -= deltaY * 1; // Orbit lên/xuống (Giảm hệ số)
                     cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
                     didMoveDuringDrag = true;
                 }
