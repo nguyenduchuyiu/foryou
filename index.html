@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Floating Text - Smooth Color Transitions - Three.js</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif; /* Changed font to Inter */
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 14px;
+            text-shadow: 0 0 10px #000;
+            pointer-events: auto;
+            background-color: rgba(0, 0, 0, 0.5); /* Added background for readability */
+            padding: 10px;
+            border-radius: 8px; /* Rounded corners */
+        }
+
+        #audio-start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200; /* Above other UI elements */
+            cursor: pointer;
+            flex-direction: column; /* For stacking text and button */
+            color: #fff;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #audio-start-button {
+            background-color: #ff69b4; /* Pink button */
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4); /* Soft pink shadow */
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        #audio-start-button:hover {
+            background-color: #ff4d94; /* Darker pink on hover */
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div class="ui-overlay">
+    </div>
+
+    <div id="audio-start-overlay">
+        <p>Click để bắt đầu trải nghiệm âm nhạc</p>
+        <button id="audio-start-button">Bắt đầu</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script> <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 1);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        camera.position.z = 50;
+
+        const messages = [
+            "Thank you for coming to celebrate with us", "Happy Anniversary, my love!", "I love you so much more than words can say", "Celebrating our special day: 14/05/2024",
+            "You mean absolutely everything to me; you're my world", "Let's stay together forever, hand in hand", "My heart belongs to you, now and always",
+            "Happy Anniversary to the most amazing person in my life!", "You are my world, my sun, my moon, and all my stars", "Always and forever, my love will be true", "My love for you grows stronger with each passing day",
+            "Thank you for being mine; I'm so lucky to have you", "Our love story continues to be my favorite", "You complete me in every way imaginable", "Together forever, our souls intertwined",
+            "Every moment with you is a precious gift that I cherish", "Being with you is a precious gift", "You make me smile even when I'm feeling down", "You are my soulmate, my other half",
+            "Today is the best day ever because I'm with you", "These memories we share will last a lifetime", "Dancing in the moonlight, lost in each other's eyes", "Holding hands forever, never letting go",
+            "Your beautiful smile brightens up my darkest days", "Sweet dreams together, wrapped in each other's arms", "Walking side by side through life's journey", "Laughing until we cry, creating unforgettable moments",
+            "Cooking dinner together, a simple joy I treasure", "Sunday morning cuddles, the perfect way to start the day", "Adventure awaits us, let's explore the world together", "Growing old together, our love a timeless tale",
+            "You are my favorite person, my best friend, my lover", "Home is where you are, safe and warm in your embrace", "Perfect imperfections, that's what makes our love so real", "Two hearts one love, beating in perfect harmony",
+            "Better together, always and in all ways", "Love conquers all, especially with you by my side", "Happily ever after starts now, with you as my bride/groom", "You're my partner in crime, my confidant, my everything",
+            "Life is beautiful with you, every moment a blessing", "Thank you for choosing me to share your life with", "Every day is Valentine's Day when I'm with you",
+            "You're my sunshine on a cloudy day, my guiding light", "Sweet love of mine, you're the melody in my heart", "Together we can do anything, our love knows no bounds", "My heart is yours completely, take care of it",
+            "I love you to the moon and back again, endlessly", "And back again, my love for you is infinite", "Forever and always, my commitment to you is unwavering", "You're my one true love, my destiny fulfilled"
+        ];
+
+        const textObjects = [];
+        const heartObjects = [];
+
+        const MAX_TEXTS = 80;
+        const MAX_HEARTS = 40;
+
+        const textMeshPool = [];
+        const heartMeshPool = [];
+
+        const textureCache = new Map();
+        const materialCache = new Map();
+        const geometryCache = new Map();
+
+        // --- Smooth Color Transition Logic ---
+        const colorStages = [
+            { from: 0xFF0000, to: 0xFFC0CB }, // Đỏ sang Hồng
+            { from: 0xFFC0CB, to: 0xE6E6FF }, // Hồng sang Trắng Xanh (AliceBlue like: 0xF0F8FF, or custom: 0xE6E6FF)
+            { from: 0xE6E6FF, to: 0xFFC0CB }, // Trắng Xanh về Hồng
+            { from: 0xFFC0CB, to: 0xFF0000 }  // Hồng về Đỏ
+        ];
+        let currentStageIndex = 0;
+        let transitionProgress = 0; // 0 to 1
+        const transitionDuration = 5000; // 5 seconds per stage (in milliseconds)
+
+        let fromColor = new THREE.Color();
+        let toColor = new THREE.Color();
+        let interpolatedTextColor = new THREE.Color();
+
+        // Initialize first stage colors
+        fromColor.setHex(colorStages[currentStageIndex].from);
+        toColor.setHex(colorStages[currentStageIndex].to);
+        // --- End Smooth Color Transition Logic ---
+
+
+        let sharedHeartGeometry, sharedHeartMaterial;
+
+        function initSharedHeartResources() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 128;
+            canvas.height = 128;
+            context.font = 'bold 80px Arial';
+            context.fillStyle = '#ff6347';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.shadowColor = '#ff6347';
+            context.shadowBlur = 10;
+            context.fillText('❤️', canvas.width / 2, canvas.height / 2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            sharedHeartMaterial = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide,
+                opacity: 1
+            });
+            sharedHeartGeometry = new THREE.PlaneGeometry(3, 3);
+        }
+        initSharedHeartResources();
+
+        function createTextMesh(text, size, isTitle = false) {
+            const textStyleKey = `${text}-${size}-${isTitle}-white`;
+
+            let texture = textureCache.get(textStyleKey);
+            let planeWidth, planeHeight;
+
+            if (!texture) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const fontPx = size * (isTitle ? 50 : 40);
+                context.font = `bold ${fontPx}px Inter`; /* Changed font to Inter */
+
+                const textMetrics = context.measureText(text);
+                canvas.width = Math.ceil(textMetrics.width + fontPx * (isTitle ? 2.2 : 2.7));
+                canvas.height = Math.ceil(fontPx * (isTitle ? 2.7 : 3.2));
+
+                context.font = `bold ${fontPx}px Inter`; /* Changed font to Inter */
+                context.fillStyle = '#FFFFFF';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.shadowColor = '#FFFFFF';
+                context.shadowBlur = isTitle ? 150 : 120;
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+                texture = new THREE.CanvasTexture(canvas);
+                textureCache.set(textStyleKey, texture);
+
+                if (textureCache.size > 200) {
+                    const oldestKey = textureCache.keys().next().value;
+                    textureCache.get(oldestKey).dispose();
+                    textureCache.delete(oldestKey);
+                }
+            }
+
+            const scaleFactor = isTitle ? 60 : 50;
+            planeWidth = texture.image.width / scaleFactor;
+            planeHeight = texture.image.height / scaleFactor;
+
+            const geometryKey = `plane-${planeWidth}-${planeHeight}`;
+            let geometry = geometryCache.get(geometryKey);
+            if (!geometry) {
+                geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+                geometryCache.set(geometryKey, geometry);
+                 if (geometryCache.size > 100) {
+                    const oldestKey = geometryCache.keys().next().value;
+                    geometryCache.get(oldestKey).dispose();
+                    geometryCache.delete(oldestKey);
+                }
+            }
+
+            const baseMaterialKey = `mat-white-texture-${textStyleKey}`;
+            let baseMaterial = materialCache.get(baseMaterialKey);
+            if (!baseMaterial) {
+                baseMaterial = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    opacity: 1
+                });
+                materialCache.set(baseMaterialKey, baseMaterial);
+                if (materialCache.size > 200) {
+                    const oldestKey = materialCache.keys().next().value;
+                    materialCache.get(oldestKey).dispose();
+                    materialCache.delete(oldestKey);
+                }
+            }
+
+            let mesh;
+            if (!isTitle && textMeshPool.length > 0) {
+                mesh = textMeshPool.pop();
+                if (mesh.material && mesh.material.uuid !== baseMaterial.uuid) {
+                    if(mesh.material.map && mesh.material.map.uuid !== texture.uuid) mesh.material.map.dispose();
+                    mesh.material.dispose();
+                }
+                if(mesh.geometry && mesh.geometry.uuid !== geometry.uuid) mesh.geometry.dispose();
+
+                mesh.geometry = geometry;
+                mesh.material = baseMaterial.clone();
+            } else {
+                mesh = new THREE.Mesh(geometry, baseMaterial.clone());
+            }
+
+            mesh.material.map = texture;
+            mesh.visible = true;
+            return mesh;
+        }
+
+        const mainTitleText = createTextMesh("From The Day We Met", 3.5, true);
+        mainTitleText.position.set(0, 7, 0);
+        scene.add(mainTitleText);
+
+        const dateText = createTextMesh("25/10/2024", 2, true);
+        dateText.position.set(0, -2, 0);
+        scene.add(dateText);
+
+
+        function getHeartMesh() {
+            let heartMesh;
+            if (heartMeshPool.length > 0) {
+                heartMesh = heartMeshPool.pop();
+                heartMesh.visible = true;
+                heartMesh.material.opacity = 1;
+            } else {
+                heartMesh = new THREE.Mesh(sharedHeartGeometry, sharedHeartMaterial.clone());
+                heartMesh.material.opacity = 1;
+            }
+            return heartMesh;
+        }
+
+        function returnToPool(mesh, type) {
+            mesh.visible = false;
+            if (mesh === mainTitleText || mesh === dateText) {
+                return;
+            }
+
+            scene.remove(mesh);
+            if (type === 'text') {
+                textMeshPool.push(mesh);
+            } else if (type === 'heart') {
+                heartMeshPool.push(mesh);
+            }
+        }
+
+        function addFloatingText() {
+            if (textObjects.length >= MAX_TEXTS) {
+                const oldText = textObjects.shift();
+                returnToPool(oldText, 'text');
+            }
+
+            const text = messages[Math.floor(Math.random() * messages.length)];
+            const sizes = [1.2, 1.5, 1.8, 2, 2.2, 2.5];
+            const size = sizes[Math.floor(Math.random() * sizes.length)];
+
+            const textMesh = createTextMesh(text, size, false);
+
+            let startY;
+            if (Math.random() < 0.4) {
+                startY = (Math.random() - 0.5) * 40;
+            } else {
+                startY = 40 + Math.random() * 30;
+            }
+            textMesh.position.y = startY;
+            textMesh.position.x = (Math.random() - 0.5) * 80;
+            textMesh.position.z = (Math.random() - 0.5) * 80;
+
+            textMesh.rotation.set(0, 0, 0);
+            textMesh.material.opacity = 1;
+
+            textMesh.userData = {
+                speed: 0.06,
+                originalOpacity: 1,
+                fixedRotation: true
+            };
+            scene.add(textMesh);
+            textObjects.push(textMesh);
+        }
+
+        function addFloatingHeart() {
+            if (heartObjects.length >= MAX_HEARTS) {
+                const oldHeart = heartObjects.shift();
+                returnToPool(oldHeart, 'heart');
+            }
+
+            const heartMesh = getHeartMesh();
+            heartMesh.position.x = (Math.random() - 0.5) * 60;
+            heartMesh.position.y = 30 + Math.random() * 10;
+            heartMesh.position.z = (Math.random() - 0.5) * 30;
+            heartMesh.material.opacity = 1;
+
+            heartMesh.userData = {
+                speed: 0.08,
+                bobSpeed: 0.03,
+                bobAmount: 1.5,
+                time: Math.random() * Math.PI * 2,
+                baseY: heartMesh.position.y
+            };
+            scene.add(heartMesh);
+            heartObjects.push(heartMesh);
+        }
+
+        let isLeftMouseDown = false;
+        let cameraRotationX = 0;
+        let cameraRotationY = 0;
+        let cameraTargetDistance = 50;
+        let cameraCurrentDistance = 50;
+        let lastMouseX, lastMouseY;
+
+        document.addEventListener('mousemove', (event) => {
+            const currentMouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            const currentMouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (typeof lastMouseX === 'undefined') {
+                lastMouseX = currentMouseX;
+                lastMouseY = currentMouseY;
+            }
+            const deltaX = currentMouseX - lastMouseX;
+            const deltaY = currentMouseY - lastMouseY;
+
+            if (isLeftMouseDown) {
+                cameraRotationY -= deltaX * 2;
+                cameraRotationX -= deltaY * 2;
+                cameraRotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraRotationX));
+            }
+            lastMouseX = currentMouseX;
+            lastMouseY = currentMouseY;
+        });
+
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 0) {
+                isLeftMouseDown = true;
+                lastMouseX = (event.clientX / window.innerWidth) * 2 - 1;
+                lastMouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+            }
+        });
+        document.addEventListener('mouseup', (event) => {
+            if (event.button === 0) {
+                if (isLeftMouseDown) {
+                   isLeftMouseDown = false;
+                }
+            }
+        });
+        document.addEventListener('contextmenu', (event) => event.preventDefault());
+        document.addEventListener('wheel', (event) => {
+            cameraTargetDistance += event.deltaY * 0.05;
+            cameraTargetDistance = Math.max(20, Math.min(100, cameraTargetDistance));
+            event.preventDefault();
+        }, { passive: false });
+
+        let clickStartTime = 0;
+        const CLICK_THRESHOLD = 200;
+
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 0) {
+                clickStartTime = Date.now();
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            const clickDuration = Date.now() - clickStartTime;
+            const wasDragged = Math.abs(event.clientX / window.innerWidth * 2 - 1 - lastMouseX) > 0.01 ||
+                               Math.abs(-(event.clientY / window.innerHeight) * 2 + 1 - lastMouseY) > 0.01;
+
+            if (event.button === 0 && clickDuration < CLICK_THRESHOLD && !wasDragged) {
+                 for (let i = 0; i < 2; i++) setTimeout(() => addFloatingHeart(), i * 150);
+            }
+        });
+
+
+        const ambientLight = new THREE.AmbientLight(0xCCCCCC, 1.0);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xff69b4, 1.5, 150);
+        pointLight.position.set(0, 20, 40);
+        scene.add(pointLight);
+
+        const particleGeometry = new THREE.BufferGeometry();
+        const particleCount = 300;
+        const positions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount * 3; i++) positions[i] = (Math.random() - 0.5) * 250;
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0xff69b4, size: 0.7, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending
+        });
+        const particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            // --- Smooth Color Transition Update ---
+            transitionProgress += (delta * 1000) / transitionDuration;
+
+            if (transitionProgress >= 1.0) {
+                transitionProgress = 0;
+                currentStageIndex = (currentStageIndex + 1) % colorStages.length;
+                fromColor.setHex(colorStages[currentStageIndex].from);
+                toColor.setHex(colorStages[currentStageIndex].to);
+            }
+            interpolatedTextColor.copy(fromColor).lerp(toColor, transitionProgress);
+
+            if (mainTitleText && mainTitleText.material) {
+                mainTitleText.material.color.copy(interpolatedTextColor);
+            }
+            if (dateText && dateText.material) {
+                dateText.material.color.copy(interpolatedTextColor);
+            }
+            textObjects.forEach(textMesh => {
+                if (textMesh.material) {
+                    textMesh.material.color.copy(interpolatedTextColor);
+                }
+            });
+            // --- End Smooth Color Transition Update ---
+
+
+            cameraCurrentDistance += (cameraTargetDistance - cameraCurrentDistance) * 0.1;
+            camera.position.x = Math.sin(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance;
+            camera.position.y = Math.sin(cameraRotationX) * cameraCurrentDistance;
+            camera.position.z = Math.cos(cameraRotationY) * Math.cos(cameraRotationX) * cameraCurrentDistance;
+            camera.lookAt(0, 0, 0);
+
+            particles.rotation.y += 0.0004;
+
+            for (let i = textObjects.length - 1; i >= 0; i--) {
+                const textMesh = textObjects[i];
+                textMesh.position.y -= textMesh.userData.speed;
+
+                const fadeStart = textMesh.position.y > 0 ? -15 : -30;
+                const fadeEnd = textMesh.position.y > 0 ? -45 : -60;
+
+                if (textMesh.position.y < fadeStart) {
+                    const fadeProgress = Math.max(0, (textMesh.position.y - fadeEnd) / (fadeStart - fadeEnd));
+                    textMesh.material.opacity = textMesh.userData.originalOpacity * fadeProgress;
+                } else {
+                     textMesh.material.opacity = textMesh.userData.originalOpacity;
+                }
+
+                if (textMesh.position.y < -70 || textMesh.material.opacity <= 0.01) {
+                    returnToPool(textMesh, 'text');
+                    textObjects.splice(i, 1);
+                }
+            }
+
+            for (let i = heartObjects.length - 1; i >= 0; i--) {
+                const heartMesh = heartObjects[i];
+
+                if (heartMesh.userData.baseY === undefined) {
+                    heartMesh.userData.baseY = heartMesh.position.y;
+                }
+
+                heartMesh.userData.baseY -= heartMesh.userData.speed;
+
+                heartMesh.userData.time += heartMesh.userData.bobSpeed;
+
+                heartMesh.position.y = heartMesh.userData.baseY + Math.sin(heartMesh.userData.time) * heartMesh.userData.bobAmount * 0.05;
+
+                heartMesh.lookAt(camera.position);
+
+                heartMesh.material.opacity = 1;
+
+                if (heartMesh.userData.baseY < -40) {
+                    returnToPool(heartMesh, 'heart');
+                    heartObjects.splice(i, 1);
+                }
+            }
+            renderer.render(scene, camera);
+        }
+
+        // Start animation loop
+        animate();
+
+        // Periodically add new text and hearts
+        setInterval(addFloatingText, 100);
+        setInterval(addFloatingHeart, 200);
+
+        // Initial burst of texts and hearts
+        for (let i = 0; i < 15; i++) {
+            setTimeout(addFloatingText, i * 200);
+        }
+        for (let i = 0; i < 5; i++) {
+            setTimeout(addFloatingHeart, i * 300);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Audio Logic with Tone.js ---
+        let backgroundMusicPlayer;
+        const audioStartOverlay = document.getElementById('audio-start-overlay');
+        const audioStartButton = document.getElementById('audio-start-button');
+        let audioStarted = false;
+
+        // Function to start audio
+        async function startAudio() {
+            if (audioStarted) return; // Prevent multiple starts
+
+            try {
+                await Tone.start(); // Start Tone.js audio context
+                console.log('Audio context started');
+
+                backgroundMusicPlayer = new Tone.Player({
+                    url: "ladyKiller.mp3", // Use local MP3 file
+                    loop: true,
+                    autostart: true, // Autostart after Tone.start() and user interaction
+                    volume: -10 // Adjust volume as needed (in dB)
+                }).toDestination();
+
+                // Remove the overlay after audio starts
+                audioStartOverlay.style.display = 'none';
+                audioStarted = true;
+
+            } catch (error) {
+                console.error('Error starting audio context or loading music:', error);
+                // Optionally, display an error message to the user
+            }
+        }
+
+        // Event listener for the button click to start audio
+        audioStartButton.addEventListener('click', startAudio);
+
+        // Fallback: If user clicks anywhere else on the overlay, start audio
+        audioStartOverlay.addEventListener('click', startAudio);
+
+        // --- End Audio Logic ---
+    </script>
+</body>
+</html>
