@@ -2,8 +2,8 @@ import qrcode
 import numpy as np
 from PIL import Image, ImageDraw
 
-# URL = "https://nguyenduchuyiu.github.io/foryou/"
-URL = "00020101021138560010A0000007270126000697041501121058725587790208QRIBFTTA53037045802VN63043E18"
+URL = "https://nguyenduchuyiu.github.io/foryou/"
+# URL = "00020101021138560010A0000007270126000697041501121058725587790208QRIBFTTA53037045802VN63043E18"
 
 # ——————————————
 # 1) Tạo QR pink & mask trái tim (toàn bộ canvas)
@@ -49,6 +49,7 @@ qr2 = qrcode.QRCode(
 qr2.add_data(URL)
 qr2.make(fit=True)
 qr2_img = qr2.make_image(fill_color="pink", back_color="white").convert("RGBA")
+qr2_img = qr2_img.rotate(45, expand=True)
 
 # Chuyển trắng → trong suốt
 pw = qr2_img.load()
@@ -66,10 +67,21 @@ cy = (h - fh)//2
 heart_qr = heart_qr.convert("RGBA")
 
 # Đè một hình vuông màu trắng
-white_square = Image.new("RGBA", (fw, fh), (255, 255, 255, 255))
-heart_qr.paste(white_square, (cx, cy))
+rotated_fw, rotated_fh = qr2_img.size # Lấy kích thước của qr2_img
+white_square = Image.new("RGBA", (rotated_fw-100, rotated_fh-100), (255, 255, 255, 255)) # Tạo hình vuông trắng cùng kích thước
+white_square = white_square.rotate(45) # Xoay hình vuông 45 độ
+white_square = white_square.convert("RGBA") # Đảm bảo có alpha channel
+rotated_fw, rotated_fh = white_square.size
+cx_rotated = (w - rotated_fw) // 2
+cy_rotated = (h - rotated_fh) // 2
+heart_qr.paste(white_square, (cx_rotated, cy_rotated), white_square) # Sử dụng white_square làm mask
 
-heart_qr.paste(qr2_img, (cx, cy), qr2_img)
+
+rotated_fw, rotated_fh = qr2_img.size
+cx_rotated = (w - rotated_fw) // 2
+cy_rotated = (h - rotated_fh) // 2
+
+heart_qr.paste(qr2_img, (cx_rotated, cy_rotated), qr2_img)
 
 # ——————————————————
 # 4) Lưu kết quả

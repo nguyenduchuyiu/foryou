@@ -103,21 +103,22 @@
 
         camera.position.z = 50;
 
-        const messages = [
-            "Thank you for coming to celebrate with us", "Happy Anniversary, my love!", "I love you so much more than words can say", "Celebrating our special day: 14/05/2024",
-            "You mean absolutely everything to me; you're my world", "Let's stay together forever, hand in hand", "My heart belongs to you, now and always",
-            "Happy Anniversary to the most amazing person in my life!", "You are my world, my sun, my moon, and all my stars", "Always and forever, my love will be true", "My love for you grows stronger with each passing day",
-            "Thank you for being mine; I'm so lucky to have you", "Our love story continues to be my favorite", "You complete me in every way imaginable", "Together forever, our souls intertwined",
-            "Every moment with you is a precious gift that I cherish", "Being with you is a precious gift", "You make me smile even when I'm feeling down", "You are my soulmate, my other half",
-            "Today is the best day ever because I'm with you", "These memories we share will last a lifetime", "Dancing in the moonlight, lost in each other's eyes", "Holding hands forever, never letting go",
-            "Your beautiful smile brightens up my darkest days", "Sweet dreams together, wrapped in each other's arms", "Walking side by side through life's journey", "Laughing until we cry, creating unforgettable moments",
-            "Cooking dinner together, a simple joy I treasure", "Sunday morning cuddles, the perfect way to start the day", "Adventure awaits us, let's explore the world together", "Growing old together, our love a timeless tale",
-            "You are my favorite person, my best friend, my lover", "Home is where you are, safe and warm in your embrace", "Perfect imperfections, that's what makes our love so real", "Two hearts one love, beating in perfect harmony",
-            "Better together, always and in all ways", "Love conquers all, especially with you by my side", "Happily ever after starts now, with you as my bride/groom", "You're my partner in crime, my confidant, my everything",
-            "Life is beautiful with you, every moment a blessing", "Thank you for choosing me to share your life with", "Every day is Valentine's Day when I'm with you",
-            "You're my sunshine on a cloudy day, my guiding light", "Sweet love of mine, you're the melody in my heart", "Together we can do anything, our love knows no bounds", "My heart is yours completely, take care of it",
-            "I love you to the moon and back again, endlessly", "And back again, my love for you is infinite", "Forever and always, my commitment to you is unwavering", "You're my one true love, my destiny fulfilled"
-        ];
+        const messages = [];
+        fetch('messages.txt')
+            .then(response => response.text())
+            .then(data => {
+                // Split the content by lines to create the messages array
+                const lines = data.split('\n');
+                lines.forEach(line => {
+                    // Trim each line to remove leading/trailing whitespace
+                    const trimmedLine = line.trim();
+                    // Only add non-empty lines to the messages array
+                    if (trimmedLine !== '') {
+                        messages.push(trimmedLine);
+                    }
+                });
+            })
+            .catch(error => console.error('Error loading messages:', error));
 
         const textObjects = [];
         const heartObjects = [];
@@ -266,11 +267,11 @@
             return mesh;
         }
 
-        const mainTitleText = createTextMesh("From The Day We Met", 3.5, true);
+        const mainTitleText = createTextMesh("My Mind Right Now", 3.5, true);
         mainTitleText.position.set(0, 7, 0);
         scene.add(mainTitleText);
 
-        const dateText = createTextMesh("25/10/2024", 2, true);
+        const dateText = createTextMesh("01/06/2025", 2, true);
         dateText.position.set(0, -2, 0);
         scene.add(dateText);
 
